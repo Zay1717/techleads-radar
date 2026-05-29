@@ -1,0 +1,49 @@
+name: Daily TechLeads Scrape
+
+on:
+  schedule:
+    # Tous les jours à 6h00 UTC (8h Paris)
+    - cron: "0 6 * * 1-5"
+  workflow_dispatch:  # permet de lancer manuellement
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 lxml
+
+      - name: Run scraper
+        env:
+          FT_CLIENT_ID:     ${{ secrets.FT_CLIENT_ID }}
+          FT_CLIENT_SECRET: ${{ secrets.FT_CLIENT_SECRET }}
+        run: python src/scrape.py
+
+      - name: Commit and push results
+        run: |
+          git config user.name  "TechLeads Bot"
+          git config user.email "bot@techleads.local"
+          git add index.html jobs.json
+          git diff --cached --quiet || git commit -m "🤖 Scan du $(date +'%d/%m/%Y %H:%M')"
+          git push
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          exclude_assets: "src/**,.github/**,*.md"
